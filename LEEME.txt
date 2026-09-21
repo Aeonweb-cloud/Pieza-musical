@@ -1,0 +1,22 @@
+PRUEBA DE PIEZA SONORA SINCRONIZADA
+
+Archivos:
+- index.html       página web
+- boton.jpg        imagen subida por ti
+- prueba_30s.wav   audio de prueba de 30 segundos
+
+La emisión de prueba está programada para comenzar:
+2026-09-21T14:38:24.381446Z
+
+IMPORTANTE:
+Para la exposición real, cambia la línea:
+const EMISSION_START = new Date("2026-09-21T14:38:24.381446Z").getTime();
+
+por la fecha/hora UTC correspondiente al comienzo de la exposición.
+
+El audio de prueba tiene un tono diferente cada 5 segundos para poder comprobar
+fácilmente que dos móviles entran en el mismo punto de la pieza.
+
+La página NO muestra duración, controles ni reproductor.
+Al tocar la imagen, el audio comienza en el punto global correspondiente
+y la imagen se desvanece durante 2 segundos.
