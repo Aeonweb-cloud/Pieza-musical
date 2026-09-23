@@ -1,18 +1,24 @@
-```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
 
   <title>AEON</title>
 
+
   <style>
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+
 
     html,
     body {
@@ -22,72 +28,110 @@
       background: white;
     }
 
+
     body {
       position: relative;
     }
 
-    /* IMAGEN PRINCIPAL */
+
+    /* =========================================================
+       IMAGEN PRINCIPAL
+       ========================================================= */
+
     #button {
+
       position: fixed;
       inset: 0;
+
       width: 100%;
       height: 100%;
+
       object-fit: cover;
+
       cursor: pointer;
+
       z-index: 10;
 
       opacity: 1;
+      visibility: visible;
+
       transition: opacity 2s ease;
+
       user-select: none;
       -webkit-user-drag: none;
     }
 
+
     #button.hidden {
+
       opacity: 0;
+
       pointer-events: none;
     }
 
-    /*
-      Capa invisible que ocupa toda la pantalla.
-      Permite volver a mostrar/ocultar la imagen
-      cuando el audio ya está reproduciéndose.
-    */
+
+    /* =========================================================
+       ZONA DE INTERACCIÓN
+       ========================================================= */
+
     #touch-layer {
+
       position: fixed;
       inset: 0;
+
       z-index: 5;
+
       cursor: pointer;
+
       display: none;
     }
 
+
     #touch-layer.active {
+
       display: block;
     }
 
-    /* MENSAJE DE ERROR */
+
+    /* =========================================================
+       ERROR
+       ========================================================= */
+
     #error {
+
       position: fixed;
       inset: 0;
+
       z-index: 30;
 
       display: none;
+
       align-items: center;
       justify-content: center;
 
       padding: 30px;
+
       text-align: center;
 
       font-family: sans-serif;
       font-size: 14px;
+
       color: black;
       background: white;
     }
+
   </style>
+
 </head>
+
 
 <body>
 
-  <!-- Imagen de interacción -->
+
+  <!-- =======================================================
+       IMAGEN
+       ======================================================= -->
+
   <img
     id="button"
     src="boton.jpg"
@@ -95,16 +139,26 @@
     draggable="false"
   >
 
-  <!-- Zona invisible para interactuar cuando la imagen está oculta -->
+
+  <!-- =======================================================
+       ZONA INVISIBLE DE INTERACCIÓN
+       ======================================================= -->
+
   <div id="touch-layer"></div>
 
-  <!-- Dos reproductores usando EL MISMO archivo -->
+
+  <!-- =======================================================
+       DOS REPRODUCTORES
+       LOS DOS USAN EL MISMO MP3
+       ======================================================= -->
+
   <audio
     id="audioA"
     src="new-era.mp3"
     preload="auto"
     playsinline
   ></audio>
+
 
   <audio
     id="audioB"
@@ -113,73 +167,117 @@
     playsinline
   ></audio>
 
+
+  <!-- =======================================================
+       ERROR
+       ======================================================= -->
+
   <div id="error"></div>
+
 
   <script>
 
-    /*
-     * ============================================================
-     * CONFIGURACIÓN
-     * ============================================================
-     */
+
+    /* =========================================================
+       CONFIGURACIÓN
+       ========================================================= */
+
 
     const EMISSION_START =
-      new Date("2026-09-21T14:38:24.381446Z").getTime();
+      new Date(
+        "2026-09-21T14:38:24.381446Z"
+      ).getTime();
+
 
     /*
-     * Duración del crossfade entre un ciclo y el siguiente.
+     * Duración del crossfade.
      *
-     * 0.25 = 250 ms
-     *
-     * Si todavía notas un pequeño salto:
-     * prueba 0.35 o 0.50.
+     * 0.30 = 300 ms.
      */
     const CROSSFADE = 0.30;
 
 
-    /*
-     * ============================================================
-     * ELEMENTOS
-     * ============================================================
-     */
-
-    const button = document.getElementById("button");
-    const touchLayer = document.getElementById("touch-layer");
-    const error = document.getElementById("error");
-
-    const audioA = document.getElementById("audioA");
-    const audioB = document.getElementById("audioB");
+    /* =========================================================
+       ELEMENTOS
+       ========================================================= */
 
 
-    /*
-     * ============================================================
-     * ESTADO
-     * ============================================================
-     */
+    const button =
+      document.getElementById("button");
+
+
+    const touchLayer =
+      document.getElementById("touch-layer");
+
+
+    const error =
+      document.getElementById("error");
+
+
+    const audioA =
+      document.getElementById("audioA");
+
+
+    const audioB =
+      document.getElementById("audioB");
+
+
+    /* =========================================================
+       ESTADO
+       ========================================================= */
+
 
     let started = false;
+
     let muted = false;
-
-    let activeAudio = audioA;
-    let nextAudio = audioB;
-
-    let loopTimer = null;
-    let fadeTimer = null;
 
 
     /*
-     * ============================================================
-     * POSICIÓN GLOBAL
-     * ============================================================
+     * Audio que está sonando.
      */
+    let activeAudio = audioA;
+
+
+    /*
+     * Audio que utilizaremos para
+     * el siguiente ciclo.
+     */
+    let nextAudio = audioB;
+
+
+    /*
+     * Indica si estamos haciendo
+     * un crossfade actualmente.
+     */
+    let isCrossfading = false;
+
+
+    /*
+     * ID del requestAnimationFrame
+     * que controla el loop.
+     */
+    let loopAnimation = null;
+
+
+    /* =========================================================
+       POSICIÓN GLOBAL
+       ========================================================= */
+
 
     function getGlobalPosition() {
 
-      const duration = activeAudio.duration;
+      const duration =
+        activeAudio.duration;
 
-      if (!duration || !isFinite(duration)) {
+
+      if (
+        !duration ||
+        !isFinite(duration)
+      ) {
+
         return 0;
       }
+
 
       return (
         Math.max(
@@ -187,303 +285,690 @@
           (Date.now() - EMISSION_START) / 1000
         ) % duration
       );
+
     }
 
 
-    /*
-     * ============================================================
-     * PREPARAR EL SEGUNDO AUDIO
-     * ============================================================
-     */
+    /* =========================================================
+       CONTROL DEL LOOP
+       ========================================================= */
 
-    function prepareNextAudio(position) {
 
-      nextAudio.currentTime = position;
-      nextAudio.volume = 0;
-      nextAudio.muted = false;
+    function monitorLoop() {
+
+      /*
+       * Si todavía no ha empezado,
+       * esperamos al siguiente frame.
+       */
+
+      if (
+        !started ||
+        muted
+      ) {
+
+        loopAnimation =
+          requestAnimationFrame(
+            monitorLoop
+          );
+
+        return;
+      }
+
+
+      const current =
+        activeAudio;
+
+
+      const next =
+        nextAudio;
+
+
+      const duration =
+        current.duration;
+
+
+      /*
+       * Si todavía no conocemos
+       * la duración, seguimos esperando.
+       */
+
+      if (
+        !duration ||
+        !isFinite(duration)
+      ) {
+
+        loopAnimation =
+          requestAnimationFrame(
+            monitorLoop
+          );
+
+        return;
+      }
+
+
+      /*
+       * Cuánto falta para terminar.
+       */
+
+      const remaining =
+        duration - current.currentTime;
+
+
+      /*
+       * Cuando quedan 300 ms,
+       * empezamos el crossfade.
+       */
+
+      if (
+        remaining <= CROSSFADE &&
+        !isCrossfading
+      ) {
+
+        startCrossfade();
+      }
+
+
+      /*
+       * Continuamos vigilando.
+       */
+
+      loopAnimation =
+        requestAnimationFrame(
+          monitorLoop
+        );
+
     }
 
 
-    /*
-     * ============================================================
-     * CROSSFADE
-     * ============================================================
-     */
+    /* =========================================================
+       CROSSFADE
+       ========================================================= */
 
-    function crossfade() {
 
-      if (!started || muted) return;
+    function startCrossfade() {
 
-      const current = activeAudio;
-      const next = nextAudio;
+      if (
+        isCrossfading ||
+        !started ||
+        muted
+      ) {
+
+        return;
+      }
+
+
+      const current =
+        activeAudio;
+
+
+      const next =
+        nextAudio;
+
 
       if (
         !current.duration ||
         !isFinite(current.duration)
       ) {
+
         return;
       }
 
+
+      isCrossfading = true;
+
+
       /*
-       * El siguiente reproductor empieza desde el principio.
+       * Preparamos el segundo reproductor.
        */
+
+      next.pause();
+
       next.currentTime = 0;
+
       next.volume = 0;
 
-      next.play().catch(() => {});
+      next.muted = false;
 
-      const startTime = performance.now();
 
-      clearInterval(fadeTimer);
+      /*
+       * IMPORTANTE:
+       * arrancamos el segundo audio
+       * ANTES de que termine el primero.
+       */
 
-      fadeTimer = setInterval(() => {
+      next.play()
+        .then(() => {
+
+          performCrossfade(
+            current,
+            next
+          );
+
+        })
+        .catch((e) => {
+
+          /*
+           * Si por alguna razón el segundo
+           * reproductor no arranca, hacemos
+           * un loop de emergencia.
+           */
+
+          console.warn(
+            "Crossfade play error:",
+            e
+          );
+
+
+          current.currentTime = 0;
+
+          current.volume = 1;
+
+          isCrossfading = false;
+
+        });
+
+    }
+
+
+    /* =========================================================
+       EJECUTAR CROSSFADE
+       ========================================================= */
+
+
+    function performCrossfade(
+      current,
+      next
+    ) {
+
+      const startTime =
+        performance.now();
+
+
+      function fade() {
+
+        /*
+         * Si el usuario ha muteado
+         * durante el crossfade,
+         * cancelamos el proceso.
+         */
+
+        if (
+          muted ||
+          !started
+        ) {
+
+          current.volume = 1;
+
+          next.volume = 0;
+
+          next.pause();
+
+          isCrossfading = false;
+
+          return;
+        }
+
 
         const elapsed =
-          (performance.now() - startTime) / 1000;
+          (
+            performance.now() -
+            startTime
+          ) / 1000;
+
 
         const progress =
-          Math.min(1, elapsed / CROSSFADE);
+          Math.min(
+            1,
+            elapsed / CROSSFADE
+          );
+
 
         /*
-         * Fade out del audio actual.
+         * AUDIO ANTIGUO
+         *
+         * 1 → 0
          */
-        current.volume = 1 - progress;
+
+        current.volume =
+          1 - progress;
+
 
         /*
-         * Fade in del siguiente.
+         * AUDIO NUEVO
+         *
+         * 0 → 1
          */
-        next.volume = progress;
+
+        next.volume =
+          progress;
+
+
+        /*
+         * Crossfade terminado.
+         */
 
         if (progress >= 1) {
 
-          clearInterval(fadeTimer);
+          /*
+           * Paramos el anterior.
+           */
 
           current.pause();
+
           current.currentTime = 0;
+
           current.volume = 1;
 
-          /*
-           * Intercambiamos los reproductores.
-           */
-          activeAudio = next;
-          nextAudio = current;
 
           /*
-           * Programamos el siguiente loop.
+           * El nuevo pasa a ser
+           * el reproductor activo.
            */
-          scheduleNextLoop();
+
+          activeAudio =
+            next;
+
+
+          nextAudio =
+            current;
+
+
+          /*
+           * Terminamos el crossfade.
+           */
+
+          isCrossfading = false;
+
+
+          return;
         }
 
-      }, 16);
-    }
 
+        /*
+         * Siguiente frame.
+         */
 
-    /*
-     * ============================================================
-     * PROGRAMAR SIGUIENTE LOOP
-     * ============================================================
-     */
-
-    function scheduleNextLoop() {
-
-      clearTimeout(loopTimer);
-
-      if (!started || muted) return;
-
-      const duration = activeAudio.duration;
-
-      if (!duration || !isFinite(duration)) {
-        return;
-      }
-
-      const delay =
-        Math.max(
-          0,
-          (duration - CROSSFADE) * 1000
+        requestAnimationFrame(
+          fade
         );
 
-      loopTimer = setTimeout(() => {
+      }
 
-        if (!started || muted) return;
 
-        crossfade();
+      fade();
 
-      }, delay);
     }
 
 
-    /*
-     * ============================================================
-     * INICIAR AUDIO
-     * ============================================================
-     */
+    /* =========================================================
+       INICIAR AUDIO
+       ========================================================= */
+
 
     async function startAudio() {
 
       try {
 
+
         /*
-         * Esperamos a que el navegador conozca
+         * Esperamos a conocer
          * la duración del MP3.
          */
+
         if (!audioA.duration) {
 
-          await new Promise((resolve) => {
+          await new Promise(
+            (resolve) => {
 
-            if (audioA.duration) {
-              resolve();
-              return;
+              if (audioA.duration) {
+
+                resolve();
+
+                return;
+              }
+
+
+              audioA.addEventListener(
+                "loadedmetadata",
+                resolve,
+                {
+                  once: true
+                }
+              );
+
             }
-
-            audioA.addEventListener(
-              "loadedmetadata",
-              resolve,
-              { once: true }
-            );
-
-          });
+          );
 
         }
 
-        const position = getGlobalPosition();
 
-        audioA.currentTime = position;
-        audioA.volume = 1;
-        audioA.muted = false;
+        /*
+         * Posición global.
+         */
+
+        const position =
+          getGlobalPosition();
+
+
+        /*
+         * Preparamos A.
+         */
+
+        audioA.currentTime =
+          position;
+
+        audioA.volume =
+          1;
+
+        audioA.muted =
+          false;
+
+
+        /*
+         * Preparamos B.
+         */
 
         audioB.pause();
-        audioB.currentTime = 0;
-        audioB.volume = 0;
+
+        audioB.currentTime =
+          0;
+
+        audioB.volume =
+          0;
+
+        audioB.muted =
+          false;
+
+
+        /*
+         * Iniciamos A.
+         */
 
         await audioA.play();
 
-        activeAudio = audioA;
-        nextAudio = audioB;
-
-        started = true;
-        muted = false;
 
         /*
-         * La imagen desaparece lentamente.
+         * Estado.
          */
-        requestAnimationFrame(() => {
-          button.classList.add("hidden");
-        });
+
+        activeAudio =
+          audioA;
+
+        nextAudio =
+          audioB;
+
+        started =
+          true;
+
+        muted =
+          false;
+
+        isCrossfading =
+          false;
+
+
+        /*
+         * La imagen desaparece.
+         */
+
+        button.classList.add(
+          "hidden"
+        );
+
 
         /*
          * Activamos la zona invisible.
          */
-        touchLayer.classList.add("active");
+
+        touchLayer.classList.add(
+          "active"
+        );
+
 
         /*
-         * Programamos el crossfade.
+         * Comenzamos a vigilar
+         * continuamente el final.
          */
-        scheduleNextLoop();
 
-      } catch (e) {
+        if (!loopAnimation) {
+
+          loopAnimation =
+            requestAnimationFrame(
+              monitorLoop
+            );
+
+        }
+
+      }
+
+      catch (e) {
 
         console.error(e);
 
-        error.style.display = "flex";
+
+        error.style.display =
+          "flex";
+
+
         error.textContent =
           "No se ha podido iniciar el audio. Toca de nuevo la pantalla.";
 
       }
+
     }
 
 
-    /*
-     * ============================================================
-     * MOSTRAR / OCULTAR IMAGEN
-     * ============================================================
-     */
+    /* =========================================================
+       MOSTRAR IMAGEN
+       ========================================================= */
+
 
     function showImage() {
-      button.classList.remove("hidden");
+
+      /*
+       * La hacemos visible
+       * antes de quitar hidden.
+       */
+
+      button.style.visibility =
+        "visible";
+
+
+      button.classList.remove(
+        "hidden"
+      );
+
     }
+
+
+    /* =========================================================
+       OCULTAR IMAGEN
+       ========================================================= */
+
 
     function hideImage() {
-      button.classList.add("hidden");
+
+      /*
+       * Comienza el fade de 2 segundos.
+       */
+
+      button.classList.add(
+        "hidden"
+      );
+
+
+      /*
+       * Cuando termina el fade,
+       * ocultamos completamente
+       * el elemento.
+       */
+
+      setTimeout(() => {
+
+        if (
+          button.classList.contains(
+            "hidden"
+          )
+        ) {
+
+          button.style.visibility =
+            "hidden";
+
+        }
+
+      }, 2000);
+
     }
 
 
-    /*
-     * ============================================================
-     * SILENCIAR / REANUDAR
-     * ============================================================
-     */
+    /* =========================================================
+       MUTE / REANUDAR
+       ========================================================= */
+
 
     function toggleSound() {
 
-      if (!started) return;
+      if (!started) {
+
+        return;
+      }
+
+
+      /* =======================================================
+         MUTE
+         ======================================================= */
+
 
       if (!muted) {
 
-        /*
-         * SILENCIAR
-         */
-
         muted = true;
 
-        clearTimeout(loopTimer);
-        clearInterval(fadeTimer);
 
         /*
-         * Los dos audios se silencian.
+         * Cancelamos cualquier crossfade
+         * que estuviera sucediendo.
          */
+
+        isCrossfading = false;
+
+
+        /*
+         * Silenciamos ambos audios.
+         */
+
         audioA.muted = true;
+
         audioB.muted = true;
 
+
         /*
-         * La imagen vuelve a aparecer.
+         * La imagen aparece.
          */
+
         showImage();
 
-      } else {
+      }
 
-        /*
-         * REANUDAR
-         */
+
+      /* =======================================================
+         REANUDAR
+         ======================================================= */
+
+
+      else {
 
         muted = false;
 
-        /*
-         * Calculamos la posición global actual
-         * para volver a sincronizar.
-         */
-        const position = getGlobalPosition();
 
-        activeAudio.currentTime = position;
+        /*
+         * Volvemos a calcular la posición
+         * global exacta.
+         */
+
+        const position =
+          getGlobalPosition();
+
+
+        /*
+         * Colocamos el reproductor activo
+         * en esa posición.
+         */
+
+        activeAudio.currentTime =
+          position;
+
+
+        /*
+         * Silenciamos ambos.
+         */
 
         audioA.muted = true;
+
         audioB.muted = true;
 
-        activeAudio.muted = false;
-        activeAudio.volume = 1;
-
-        activeAudio.play().catch(() => {});
 
         /*
-         * La imagen vuelve a desaparecer.
+         * Activamos únicamente
+         * el reproductor actual.
          */
+
+        activeAudio.muted =
+          false;
+
+
+        activeAudio.volume =
+          1;
+
+
+        /*
+         * Reanudamos.
+         */
+
+        activeAudio
+          .play()
+          .catch(() => {});
+
+
+        /*
+         * La imagen desaparece.
+         */
+
         hideImage();
 
-        /*
-         * Volvemos a programar el crossfade.
-         */
-        scheduleNextLoop();
 
-      }
+        /*
+         * Volvemos a vigilar el loop.
+         */
+
+        isCrossfading =
+          false;
+
     }
 
 
+    }
+
+
+    /* =========================================================
+       EVENTOS
+       ========================================================= */
+
+
     /*
-     * ============================================================
-     * EVENTOS
-     * ============================================================
+     * Primera pulsación:
+     * iniciar.
      */
 
-    button.addEventListener("click", startAudio);
+    button.addEventListener(
+      "click",
+      startAudio
+    );
+
+
+    /*
+     * Siguientes pulsaciones:
+     * mute / reanudar.
+     */
 
     touchLayer.addEventListener(
       "click",
@@ -491,24 +976,70 @@
     );
 
 
-    /*
-     * Evitamos que el navegador intente
-     * reproducir los audios simultáneamente
-     * cuando llegan al final.
-     */
-    audioA.addEventListener("ended", () => {
-      if (!started || muted) return;
-      audioA.currentTime = 0;
-    });
+    /* =========================================================
+       PROTECCIÓN EXTRA CONTRA PARADA
+       ========================================================= */
 
-    audioB.addEventListener("ended", () => {
-      if (!started || muted) return;
-      audioB.currentTime = 0;
-    });
+
+    audioA.addEventListener(
+      "ended",
+      () => {
+
+        if (
+          !started ||
+          muted
+        ) {
+
+          return;
+        }
+
+
+        /*
+         * Si por cualquier motivo
+         * el crossfade no llegó a ejecutarse,
+         * reiniciamos inmediatamente.
+         */
+
+        if (!isCrossfading) {
+
+          audioA.currentTime = 0;
+
+          audioA.play()
+            .catch(() => {});
+
+        }
+
+      }
+    );
+
+
+    audioB.addEventListener(
+      "ended",
+      () => {
+
+        if (
+          !started ||
+          muted
+        ) {
+
+          return;
+        }
+
+
+        if (!isCrossfading) {
+
+          audioB.currentTime = 0;
+
+          audioB.play()
+            .catch(() => {});
+
+        }
+
+      }
+    );
+
 
   </script>
 
 </body>
 </html>
-```
-
