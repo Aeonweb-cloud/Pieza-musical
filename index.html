@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Prueba sonora</title>
+<title>Pieza sonora</title>
 <style>
   html, body {
     margin: 0;
@@ -12,12 +12,14 @@
     overflow: hidden;
     background: #fff;
   }
+
   body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
   }
+
   #button {
+    position: fixed;
+    inset: 0;
     width: 100vw;
     height: 100vh;
     object-fit: cover;
@@ -27,15 +29,56 @@
     -webkit-tap-highlight-color: transparent;
     opacity: 1;
     transition: opacity 2s ease;
+    z-index: 1;
   }
+
   #button.hidden {
     opacity: 0;
     pointer-events: none;
   }
+
+  /*
+    Esta capa queda siempre activa después del primer toque.
+    Permite tocar cualquier parte de la pantalla para silenciar/
+    volver a escuchar sin pausar el audio.
+  */
+  #touch-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #touch-layer.active {
+    display: block;
+  }
+
+  #message {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    font: 16px/1.4 sans-serif;
+    color: #000;
+    text-align: center;
+  }
+
+  #message.visible {
+    opacity: 1;
+  }
+
   #error {
     display: none;
     position: fixed;
     inset: 0;
+    z-index: 10;
     align-items: center;
     justify-content: center;
     padding: 30px;
@@ -46,11 +89,14 @@
   }
 </style>
 </head>
+
 <body>
 <img id="button" src="boton.jpg" alt="Pulsa para escuchar">
+<div id="touch-layer"></div>
+<div id="message">Pulsa para escuchar</div>
 <div id="error"></div>
 
-<audio id="audio" src="prueba_30s.wav" preload="auto" playsinline></audio>
+<audio id="audio" src="new-era.wav" preload="auto" playsinline></audio>
 
 <script>
 /*
@@ -62,30 +108,72 @@ const EMISSION_START = new Date("2026-09-21T14:38:24.381446Z").getTime();
 
 const audio = document.getElementById("audio");
 const button = document.getElementById("button");
+const touchLayer = document.getElementById("touch-layer");
+const message = document.getElementById("message");
 const error = document.getElementById("error");
 
-button.addEventListener("click", async () => {
-  // Calculate where the global "broadcast" currently is.
-  const elapsedSeconds = Math.max(0, (Date.now() - EMISSION_START) / 1000);
-  const position = elapsedSeconds % audio.duration;
+let started = false;
+let muted = false;
 
+function getGlobalPosition() {
+  return Math.max(0, (Date.now() - EMISSION_START) / 1000) % audio.duration;
+}
+
+async function startAudio() {
   try {
-    audio.currentTime = position;
+    // Start at the globally synchronized position.
+    audio.currentTime = getGlobalPosition();
+    audio.muted = false;
     await audio.play();
 
-    // Fade the button away over 2 seconds.
-    requestAnimationFrame(() => button.classList.add("hidden"));
+    started = true;
+    muted = false;
+
+    // Fade the original image away over 2 seconds.
+    requestAnimationFrame(() => {
+      button.classList.add("hidden");
+    });
+
+    // From now on, any tap on the screen toggles sound.
+    touchLayer.classList.add("active");
   } catch (e) {
     error.style.display = "flex";
     error.textContent = "No se ha podido iniciar el audio. Toca de nuevo la pantalla.";
   }
-});
+}
 
-// Keep the audio synchronized after looping.
-// When the file ends, jump to the position corresponding to the global clock.
+function showMessage() {
+  message.classList.add("visible");
+}
+
+function hideMessage() {
+  message.classList.remove("visible");
+}
+
+function toggleSound() {
+  if (!started) return;
+
+  if (muted) {
+    // "Unpause": the audio never stopped, it simply becomes audible again.
+    audio.muted = false;
+    muted = false;
+    hideMessage();
+  } else {
+    // Fake pause: keep the audio running, but silence it.
+    audio.muted = true;
+    muted = true;
+    showMessage();
+  }
+}
+
+button.addEventListener("click", startAudio);
+touchLayer.addEventListener("click", toggleSound);
+
+// Keep the audio synchronized when the file loops.
 audio.addEventListener("ended", () => {
-  const elapsedSeconds = Math.max(0, (Date.now() - EMISSION_START) / 1000);
-  audio.currentTime = elapsedSeconds % audio.duration;
+  if (!audio.duration) return;
+
+  audio.currentTime = getGlobalPosition();
   audio.play().catch(() => {});
 });
 </script>
