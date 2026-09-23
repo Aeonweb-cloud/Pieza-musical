@@ -1,180 +1,514 @@
-<!doctype html>
+```html
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pieza sonora</title>
-<style>
-  html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #fff;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-  body {
-    position: relative;
-  }
+  <title>AEON</title>
 
-  #button {
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    opacity: 1;
-    transition: opacity 2s ease;
-    z-index: 1;
-  }
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  #button.hidden {
-    opacity: 0;
-    pointer-events: none;
-  }
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: white;
+    }
 
-  /*
-    Esta capa queda siempre activa después del primer toque.
-    Permite tocar cualquier parte de la pantalla para silenciar/
-    volver a escuchar sin pausar el audio.
-  */
-  #touch-layer {
-    position: fixed;
-    inset: 0;
-    z-index: 2;
-    display: none;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
+    body {
+      position: relative;
+    }
 
-  #touch-layer.active {
-    display: block;
-  }
+    /* IMAGEN PRINCIPAL */
+    #button {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      cursor: pointer;
+      z-index: 10;
 
-  #message {
-    position: fixed;
-    inset: 0;
-    z-index: 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 1.5s ease;
-    font: 16px/1.4 sans-serif;
-    color: #000;
-    text-align: center;
-  }
+      opacity: 1;
+      transition: opacity 2s ease;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
 
-  #message.visible {
-    opacity: 1;
-  }
+    #button.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
 
-  #error {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    align-items: center;
-    justify-content: center;
-    padding: 30px;
-    box-sizing: border-box;
-    font: 16px/1.4 sans-serif;
-    text-align: center;
-    background: white;
-  }
-</style>
+    /*
+      Capa invisible que ocupa toda la pantalla.
+      Permite volver a mostrar/ocultar la imagen
+      cuando el audio ya está reproduciéndose.
+    */
+    #touch-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      cursor: pointer;
+      display: none;
+    }
+
+    #touch-layer.active {
+      display: block;
+    }
+
+    /* MENSAJE DE ERROR */
+    #error {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+
+      display: none;
+      align-items: center;
+      justify-content: center;
+
+      padding: 30px;
+      text-align: center;
+
+      font-family: sans-serif;
+      font-size: 14px;
+      color: black;
+      background: white;
+    }
+  </style>
 </head>
 
 <body>
-<img id="button" src="boton.jpg" alt="Pulsa para escuchar">
-<div id="touch-layer"></div>
-<div id="message">Pulsa para escuchar</div>
-<div id="error"></div>
 
-<audio id="audio" src="new-era.mp3" preload="auto" playsinline></audio>
-<script>
-/*
-  DEMO:
-  La emisión comienza en este momento UTC.
-  Para la exposición real cambia SOLO esta fecha/hora.
-*/
-const EMISSION_START = new Date("2026-09-21T14:38:24.381446Z").getTime();
+  <!-- Imagen de interacción -->
+  <img
+    id="button"
+    src="boton.jpg"
+    alt=""
+    draggable="false"
+  >
 
-const audio = document.getElementById("audio");
-const button = document.getElementById("button");
-const touchLayer = document.getElementById("touch-layer");
-const message = document.getElementById("message");
-const error = document.getElementById("error");
+  <!-- Zona invisible para interactuar cuando la imagen está oculta -->
+  <div id="touch-layer"></div>
 
-let started = false;
-let muted = false;
+  <!-- Dos reproductores usando EL MISMO archivo -->
+  <audio
+    id="audioA"
+    src="new-era.mp3"
+    preload="auto"
+    playsinline
+  ></audio>
 
-function getGlobalPosition() {
-  return Math.max(0, (Date.now() - EMISSION_START) / 1000) % audio.duration;
-}
+  <audio
+    id="audioB"
+    src="new-era.mp3"
+    preload="auto"
+    playsinline
+  ></audio>
 
-async function startAudio() {
-  try {
-    // Start at the globally synchronized position.
-    audio.currentTime = getGlobalPosition();
-    audio.muted = false;
-    await audio.play();
+  <div id="error"></div>
 
-    started = true;
-    muted = false;
+  <script>
 
-    // Fade the original image away over 2 seconds.
-    requestAnimationFrame(() => {
+    /*
+     * ============================================================
+     * CONFIGURACIÓN
+     * ============================================================
+     */
+
+    const EMISSION_START =
+      new Date("2026-09-21T14:38:24.381446Z").getTime();
+
+    /*
+     * Duración del crossfade entre un ciclo y el siguiente.
+     *
+     * 0.25 = 250 ms
+     *
+     * Si todavía notas un pequeño salto:
+     * prueba 0.35 o 0.50.
+     */
+    const CROSSFADE = 0.30;
+
+
+    /*
+     * ============================================================
+     * ELEMENTOS
+     * ============================================================
+     */
+
+    const button = document.getElementById("button");
+    const touchLayer = document.getElementById("touch-layer");
+    const error = document.getElementById("error");
+
+    const audioA = document.getElementById("audioA");
+    const audioB = document.getElementById("audioB");
+
+
+    /*
+     * ============================================================
+     * ESTADO
+     * ============================================================
+     */
+
+    let started = false;
+    let muted = false;
+
+    let activeAudio = audioA;
+    let nextAudio = audioB;
+
+    let loopTimer = null;
+    let fadeTimer = null;
+
+
+    /*
+     * ============================================================
+     * POSICIÓN GLOBAL
+     * ============================================================
+     */
+
+    function getGlobalPosition() {
+
+      const duration = activeAudio.duration;
+
+      if (!duration || !isFinite(duration)) {
+        return 0;
+      }
+
+      return (
+        Math.max(
+          0,
+          (Date.now() - EMISSION_START) / 1000
+        ) % duration
+      );
+    }
+
+
+    /*
+     * ============================================================
+     * PREPARAR EL SEGUNDO AUDIO
+     * ============================================================
+     */
+
+    function prepareNextAudio(position) {
+
+      nextAudio.currentTime = position;
+      nextAudio.volume = 0;
+      nextAudio.muted = false;
+    }
+
+
+    /*
+     * ============================================================
+     * CROSSFADE
+     * ============================================================
+     */
+
+    function crossfade() {
+
+      if (!started || muted) return;
+
+      const current = activeAudio;
+      const next = nextAudio;
+
+      if (
+        !current.duration ||
+        !isFinite(current.duration)
+      ) {
+        return;
+      }
+
+      /*
+       * El siguiente reproductor empieza desde el principio.
+       */
+      next.currentTime = 0;
+      next.volume = 0;
+
+      next.play().catch(() => {});
+
+      const startTime = performance.now();
+
+      clearInterval(fadeTimer);
+
+      fadeTimer = setInterval(() => {
+
+        const elapsed =
+          (performance.now() - startTime) / 1000;
+
+        const progress =
+          Math.min(1, elapsed / CROSSFADE);
+
+        /*
+         * Fade out del audio actual.
+         */
+        current.volume = 1 - progress;
+
+        /*
+         * Fade in del siguiente.
+         */
+        next.volume = progress;
+
+        if (progress >= 1) {
+
+          clearInterval(fadeTimer);
+
+          current.pause();
+          current.currentTime = 0;
+          current.volume = 1;
+
+          /*
+           * Intercambiamos los reproductores.
+           */
+          activeAudio = next;
+          nextAudio = current;
+
+          /*
+           * Programamos el siguiente loop.
+           */
+          scheduleNextLoop();
+        }
+
+      }, 16);
+    }
+
+
+    /*
+     * ============================================================
+     * PROGRAMAR SIGUIENTE LOOP
+     * ============================================================
+     */
+
+    function scheduleNextLoop() {
+
+      clearTimeout(loopTimer);
+
+      if (!started || muted) return;
+
+      const duration = activeAudio.duration;
+
+      if (!duration || !isFinite(duration)) {
+        return;
+      }
+
+      const delay =
+        Math.max(
+          0,
+          (duration - CROSSFADE) * 1000
+        );
+
+      loopTimer = setTimeout(() => {
+
+        if (!started || muted) return;
+
+        crossfade();
+
+      }, delay);
+    }
+
+
+    /*
+     * ============================================================
+     * INICIAR AUDIO
+     * ============================================================
+     */
+
+    async function startAudio() {
+
+      try {
+
+        /*
+         * Esperamos a que el navegador conozca
+         * la duración del MP3.
+         */
+        if (!audioA.duration) {
+
+          await new Promise((resolve) => {
+
+            if (audioA.duration) {
+              resolve();
+              return;
+            }
+
+            audioA.addEventListener(
+              "loadedmetadata",
+              resolve,
+              { once: true }
+            );
+
+          });
+
+        }
+
+        const position = getGlobalPosition();
+
+        audioA.currentTime = position;
+        audioA.volume = 1;
+        audioA.muted = false;
+
+        audioB.pause();
+        audioB.currentTime = 0;
+        audioB.volume = 0;
+
+        await audioA.play();
+
+        activeAudio = audioA;
+        nextAudio = audioB;
+
+        started = true;
+        muted = false;
+
+        /*
+         * La imagen desaparece lentamente.
+         */
+        requestAnimationFrame(() => {
+          button.classList.add("hidden");
+        });
+
+        /*
+         * Activamos la zona invisible.
+         */
+        touchLayer.classList.add("active");
+
+        /*
+         * Programamos el crossfade.
+         */
+        scheduleNextLoop();
+
+      } catch (e) {
+
+        console.error(e);
+
+        error.style.display = "flex";
+        error.textContent =
+          "No se ha podido iniciar el audio. Toca de nuevo la pantalla.";
+
+      }
+    }
+
+
+    /*
+     * ============================================================
+     * MOSTRAR / OCULTAR IMAGEN
+     * ============================================================
+     */
+
+    function showImage() {
+      button.classList.remove("hidden");
+    }
+
+    function hideImage() {
       button.classList.add("hidden");
+    }
+
+
+    /*
+     * ============================================================
+     * SILENCIAR / REANUDAR
+     * ============================================================
+     */
+
+    function toggleSound() {
+
+      if (!started) return;
+
+      if (!muted) {
+
+        /*
+         * SILENCIAR
+         */
+
+        muted = true;
+
+        clearTimeout(loopTimer);
+        clearInterval(fadeTimer);
+
+        /*
+         * Los dos audios se silencian.
+         */
+        audioA.muted = true;
+        audioB.muted = true;
+
+        /*
+         * La imagen vuelve a aparecer.
+         */
+        showImage();
+
+      } else {
+
+        /*
+         * REANUDAR
+         */
+
+        muted = false;
+
+        /*
+         * Calculamos la posición global actual
+         * para volver a sincronizar.
+         */
+        const position = getGlobalPosition();
+
+        activeAudio.currentTime = position;
+
+        audioA.muted = true;
+        audioB.muted = true;
+
+        activeAudio.muted = false;
+        activeAudio.volume = 1;
+
+        activeAudio.play().catch(() => {});
+
+        /*
+         * La imagen vuelve a desaparecer.
+         */
+        hideImage();
+
+        /*
+         * Volvemos a programar el crossfade.
+         */
+        scheduleNextLoop();
+
+      }
+    }
+
+
+    /*
+     * ============================================================
+     * EVENTOS
+     * ============================================================
+     */
+
+    button.addEventListener("click", startAudio);
+
+    touchLayer.addEventListener(
+      "click",
+      toggleSound
+    );
+
+
+    /*
+     * Evitamos que el navegador intente
+     * reproducir los audios simultáneamente
+     * cuando llegan al final.
+     */
+    audioA.addEventListener("ended", () => {
+      if (!started || muted) return;
+      audioA.currentTime = 0;
     });
 
-    // From now on, any tap on the screen toggles sound.
-    touchLayer.classList.add("active");
-  } catch (e) {
-    error.style.display = "flex";
-    error.textContent = "No se ha podido iniciar el audio. Toca de nuevo la pantalla.";
-  }
-}
+    audioB.addEventListener("ended", () => {
+      if (!started || muted) return;
+      audioB.currentTime = 0;
+    });
 
-function showMessage() {
-  message.classList.add("visible");
-}
+  </script>
 
-function hideMessage() {
-  message.classList.remove("visible");
-}
-
-function toggleSound() {
-  if (!started) return;
-
-  if (muted) {
-    // "Unpause": the audio never stopped, it simply becomes audible again.
-    audio.muted = false;
-    muted = false;
-    hideMessage();
-  } else {
-    // Fake pause: keep the audio running, but silence it.
-    audio.muted = true;
-    muted = true;
-    showMessage();
-  }
-}
-
-button.addEventListener("click", startAudio);
-touchLayer.addEventListener("click", toggleSound);
-
-// Keep the audio synchronized when the file loops.
-audio.addEventListener("ended", () => {
-  if (!audio.duration) return;
-
-  audio.currentTime = getGlobalPosition();
-  audio.play().catch(() => {});
-});
-</script>
 </body>
 </html>
+```
+
